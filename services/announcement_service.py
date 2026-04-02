@@ -46,3 +46,42 @@ def create_announcement_service(data):
 
     except Exception as e:
         return {"error": str(e)}, 500
+
+
+def get_announcements_service(batch):
+    if not batch:
+        return {"error": "Batch parameter is required"}, 400
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Fetch announcements for the specified batch, ordered by created_at desc
+        cur.execute("""
+            SELECT id, title, content, faculty_id, department, batch, priority, created_at
+            FROM announcements
+            WHERE batch = %s
+            ORDER BY created_at DESC
+        """, (batch,))
+
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        result = []
+        for r in rows:
+            result.append({
+                "id": r[0],
+                "title": r[1],
+                "content": r[2],
+                "faculty_id": r[3],
+                "department": r[4],
+                "batch": r[5],
+                "priority": r[6],
+                "created_at": str(r[7])
+            })
+
+        return result, 200
+
+    except Exception as e:
+        return {"error": str(e)}, 500
