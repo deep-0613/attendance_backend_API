@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from db import get_db_connection
 from services.auth_service import login_service, faculty_login_service
-from services.faculty_service import get_faculty_batches_service, get_student_count_service
+from services.faculty_service import get_faculty_batches_service, get_student_count_service, get_assigned_courses_service
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -67,4 +67,10 @@ def get_faculty_batches():
 def get_student_count():
     batch = request.args.get("batch")
     response, status = get_student_count_service(batch)
+    return jsonify(response), status
+
+@auth_bp.route("/api/faculty/assigned-courses", methods=["GET"])
+def get_assigned_courses():
+    faculty_id = request.args.get("faculty_id")
+    response, status = get_assigned_courses_service(faculty_id)
     return jsonify(response), status

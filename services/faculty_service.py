@@ -63,3 +63,38 @@ def get_student_count_service(batch):
 
     except Exception as e:
         return {"error": str(e)}, 500
+
+
+def get_assigned_courses_service(faculty_id):
+    if not faculty_id:
+        return {"error": "faculty_id parameter is required"}, 400
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Query to get distinct batches, courses, lab batches, and session types for faculty
+        cur.execute("""
+            SELECT DISTINCT batch, course_name, lab_batch, session_type
+            FROM timetable
+            WHERE faculty_id = %s
+            ORDER BY batch, course_name
+        """, (faculty_id,))
+
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        result = []
+        for r in rows:
+            result.append({
+                "batch": r[0],
+                "course_name": r[1],
+                "lab_batch": r[2],
+                "session_type": r[3]
+            })
+
+        return result, 200
+
+    except Exception as e:
+        return {"error": str(e)}, 500
