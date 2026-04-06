@@ -56,7 +56,7 @@ def faculty_login_service(data):
         cur = conn.cursor()
 
         cur.execute("""
-            SELECT faculty_id, password_hash, name, email, department, designation
+            SELECT faculty_id, password_hash, name, email, phone, department, designation, created_at
             FROM faculty
             WHERE faculty_id = %s
         """, (faculty_id,))
@@ -70,7 +70,7 @@ def faculty_login_service(data):
         if not user:
             return {"error": "Invalid faculty ID"}, 404
 
-        db_faculty_id, db_password, name, email, department, designation = user
+        db_faculty_id, db_password, name, email, phone, department, designation, created_at = user
 
         # 🔑 Password check (plain text as per your system)
         if password != db_password:
@@ -82,8 +82,10 @@ def faculty_login_service(data):
             "faculty_id": db_faculty_id,
             "name": name,
             "email": email,
+            "phone": phone,
             "department": department,
-            "designation": designation
+            "designation": designation,
+            "created_at": str(created_at) if created_at else None
         }, 200
 
     except Exception as e:
