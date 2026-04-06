@@ -164,19 +164,22 @@ def get_batch_faculty_service(batch):
         conn = get_db_connection()
         cur = conn.cursor()
 
-        # Query to get distinct faculty IDs for the given batch
+        # Query to get distinct faculty IDs and names for the given batch
         cur.execute("""
-            SELECT DISTINCT faculty_id
-            FROM timetable
-            WHERE batch = %s
+            SELECT DISTINCT 
+                t.faculty_id, 
+                f.name 
+            FROM timetable t
+            JOIN faculty f ON t.faculty_id = f.faculty_id
+            WHERE t.batch = %s
         """, (batch,))
 
         rows = cur.fetchall()
         cur.close()
         conn.close()
 
-        # Extract faculty IDs from result
-        faculty_list = [row[0] for row in rows]
+        # Extract faculty info from result
+        faculty_list = [{"faculty_id": row[0], "name": row[1]} for row in rows]
 
         return {
             f"{batch} faculty": faculty_list
