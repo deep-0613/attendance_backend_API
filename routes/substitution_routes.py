@@ -18,6 +18,18 @@ def request_substitution():
     conn = get_db_connection()
     cur = conn.cursor()
 
+    # 0. Check for existing substitution request
+    cur.execute("""
+        SELECT id FROM lecture_substitutions
+        WHERE timetable_id = %s AND date = %s AND status = 'PENDING'
+    """, (timetable_id, date))
+
+    existing_request = cur.fetchone()
+    if existing_request:
+        cur.close()
+        conn.close()
+        return jsonify({"message": "Substitution already requested"}), 400
+
     # 1. Create substitution
     cur.execute("""
     INSERT INTO lecture_substitutions
@@ -37,6 +49,11 @@ def request_substitution():
     """, (original_faculty,))
 
     faculty_list = [row[0] for row in cur.fetchall()]
+
+    # DEBUG: Print faculty list to verify original faculty is excluded
+    print(f"Original faculty ID: {original_faculty}")
+    print(f"Eligible faculty list (excluding original): {faculty_list}")
+    print(f"Original faculty in list: {original_faculty in faculty_list}")
 
     conn.commit()
     cur.close()
@@ -66,10 +83,71 @@ def respond_substitution():
     faculty_id = data.get('faculty_id')
     action = data.get('action')  # ACCEPT / REJECT
 
+    # DEBUG: Print incoming request details
+    print(f"Substitution response request:")
+    print(f"  substitution_id: {substitution_id}")
+    print(f"  faculty_id: {faculty_id}")
+    print(f"  action: {action}")
+
     conn = get_db_connection()
     cur = conn.cursor()
 
+    # First, check if substitution exists and get complete details
+    cur.execute("""
+        SELECT id, timetable_id, original_faculty_id, substitute_faculty_id, status, date
+        FROM lecture_substitutions 
+        WHERE id = %s
+    """, (substitution_id,))
+
+    result = cur.fetchone()
+    if not result:
+        cur.close()
+        conn.close()
+        print(f"ERROR: Substitution ID {substitution_id} not found")
+        return jsonify({"message": "Substitution request not found"}), 404
+
+    substitution_details = {
+        'id': result[0],
+        'timetable_id': result[1], 
+        'original_faculty_id': result[2],
+        'substitute_faculty_id': result[3],
+        'status': result[4],
+        'date': result[5]
+    }
+    
+    print(f"Complete substitution record: {substitution_details}")
+    current_status = substitution_details['status']
+
     if action == "ACCEPT":
+        print(f"Checking status: current_status = '{current_status}', expected = 'PENDING'")
+        print(f"Status comparison: current_status != 'PENDING' = {current_status != 'PENDING'}")
+        print(f"Status type: {type(current_status)}, length: {len(current_status) if current_status else 'None'}")
+        
+        if current_status != "PENDING":
+            cur.close()
+            conn.close()
+            print(f"ERROR: Cannot accept substitution with status: '{current_status}'")
+            return jsonify({"message": "Already taken"}), 400
+
+        print(f"Status check passed. Proceeding with faculty validation...")
+        
+        # Check if faculty_id exists in faculty table
+        cur.execute("""
+            SELECT faculty_id, name FROM faculty 
+            WHERE faculty_id = %s
+        """, (faculty_id,))
+        
+        faculty_result = cur.fetchone()
+        if not faculty_result:
+            cur.close()
+            conn.close()
+            print(f"ERROR: Faculty ID {faculty_id} does not exist")
+            return jsonify({"message": "Invalid faculty ID"}), 400
+        
+        print(f"Faculty validated: {faculty_result[0]} - {faculty_result[1]}")
+        print(f"Proceeding with UPDATE query...")
+        print(f"UPDATE parameters: faculty_id={faculty_id}, substitution_id={substitution_id}")
+        
         cur.execute("""
         UPDATE lecture_substitutions
         SET 
@@ -82,11 +160,19 @@ def respond_substitution():
         AND lecture_substitutions.status = 'PENDING'
         """, (faculty_id, substitution_id))
 
+        print(f"UPDATE executed. Rows affected: {cur.rowcount}")
+        
         if cur.rowcount == 0:
-            return jsonify({"message": "Already taken"}), 400
+            cur.close()
+            conn.close()
+            print(f"ERROR: Update failed - no rows affected")
+            return jsonify({"message": "Failed to accept substitution"}), 400
+
+        print(f"SUCCESS: Substitution {substitution_id} accepted by faculty {faculty_id}")
 
     elif action == "REJECT":
-        # optional logic
+        # optional logic for rejection
+        print(f"REJECT action not implemented yet for substitution {substitution_id}")
         pass
 
     conn.commit()
