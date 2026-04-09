@@ -197,7 +197,7 @@ def get_pending_requests():
     cur.execute("""
         SELECT ls.id, ls.timetable_id, ls.original_faculty_id, 
                ls.original_faculty_name, ls.date, ls.created_at,
-               t.course_name, t.start_time, t.end_time, t.room_number
+               ls.status, t.course_name, t.start_time, t.end_time, t.room_number
         FROM lecture_substitutions ls
         JOIN timetable t ON ls.timetable_id = t.timetable_id
         WHERE ls.status = 'PENDING'
@@ -216,10 +216,11 @@ def get_pending_requests():
             'original_faculty_name': row[3],
             'date': str(row[4]),
             'created_at': str(row[5]),
-            'course_name': row[6],
-            'start_time': str(row[7]),
-            'end_time': str(row[8]),
-            'room_no': row[9]
+            'status': row[6],
+            'course_name': row[7],
+            'start_time': str(row[8]),
+            'end_time': str(row[9]),
+            'room_no': row[10]
         })
     
     cur.close()
