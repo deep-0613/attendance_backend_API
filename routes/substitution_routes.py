@@ -180,3 +180,94 @@ def respond_substitution():
     conn.close()
 
     return jsonify({"message": "Response recorded"})
+
+@substitution_bp.route('/substitution/requests', methods=['GET'])
+def get_pending_requests():
+    """Get pending substitution requests for a specific faculty"""
+    faculty_id = request.args.get('faculty_id')
+    
+    if not faculty_id:
+        return jsonify({"error": "faculty_id parameter is required"}), 400
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    print(f"DEBUG: Getting pending requests for faculty_id: {faculty_id}")
+    
+    cur.execute("""
+        SELECT ls.id, ls.timetable_id, ls.original_faculty_id, 
+               ls.original_faculty_name, ls.date, ls.created_at,
+               t.course_name, t.start_time, t.end_time, t.room_number
+        FROM lecture_substitutions ls
+        JOIN timetable t ON ls.timetable_id = t.timetable_id
+        WHERE ls.status = 'PENDING'
+        AND ls.original_faculty_id != %s
+        ORDER BY ls.date, t.start_time
+    """, (faculty_id,))
+    
+    print(f"DEBUG: Query executed, rows returned: {cur.rowcount}")
+    
+    requests = []
+    for row in cur.fetchall():
+        requests.append({
+            'id': row[0],
+            'timetable_id': row[1],
+            'original_faculty_id': row[2],
+            'original_faculty_name': row[3],
+            'date': str(row[4]),
+            'created_at': str(row[5]),
+            'course_name': row[6],
+            'start_time': str(row[7]),
+            'end_time': str(row[8]),
+            'room_no': row[9]
+        })
+    
+    cur.close()
+    conn.close()
+    
+    return jsonify({"pending_requests": requests})
+
+@substitution_bp.route('/substitution/accepted', methods=['GET'])
+def get_accepted_lectures():
+    """Get accepted substitution lectures for a specific faculty"""
+    faculty_id = request.args.get('faculty_id')
+    
+    if not faculty_id:
+        return jsonify({"error": "faculty_id parameter is required"}), 400
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute("""
+        SELECT ls.id, ls.timetable_id, ls.original_faculty_id, 
+               ls.original_faculty_name, ls.substitute_faculty_id,
+               ls.substitute_faculty_name, ls.date, ls.created_at,
+               t.course_name, t.start_time, t.end_time, t.room_number
+        FROM lecture_substitutions ls
+        JOIN timetable t ON ls.timetable_id = t.timetable_id
+        WHERE ls.status = 'ACCEPTED'
+        AND (ls.substitute_faculty_id = %s OR ls.original_faculty_id = %s)
+        ORDER BY ls.date, t.start_time
+    """, (faculty_id, faculty_id))
+    
+    accepted_lectures = []
+    for row in cur.fetchall():
+        accepted_lectures.append({
+            'id': row[0],
+            'timetable_id': row[1],
+            'original_faculty_id': row[2],
+            'original_faculty_name': row[3],
+            'substitute_faculty_id': row[4],
+            'substitute_faculty_name': row[5],
+            'date': str(row[6]),
+            'created_at': str(row[7]),
+            'course_name': row[8],
+            'start_time': str(row[9]),
+            'end_time': str(row[10]),
+            'room_no': row[11]
+        })
+    
+    cur.close()
+    conn.close()
+    
+    return jsonify({"accepted_lectures": accepted_lectures})
