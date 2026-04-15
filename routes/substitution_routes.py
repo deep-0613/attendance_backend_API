@@ -339,3 +339,48 @@ def get_substitution_notifications():
         cur.close()
         conn.close()
         return jsonify({"error": "Internal server error"}), 500
+
+@substitution_bp.route('/student/attendance', methods=['GET'])
+def get_student_attendance():
+    """Get student attendance details with exact query results"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("""
+            SELECT 
+                s.name AS "Student Name",
+                s.year AS "Batch",
+                s.lab_batch AS "Lab Group",
+                c.course_name AS "Subject",
+                sa.lectures_attended AS "Attended",
+                c.total_lectures_planned AS "Total",
+                (CAST(sa.lectures_attended AS NUMERIC) / CAST(c.total_lectures_planned AS NUMERIC)) * 100 AS "Attendance %"
+            FROM student_attendance sa
+            JOIN students s ON sa.student_id = s.student_id
+            JOIN courses c ON sa.course_code = c.course_code
+            ORDER BY s.year DESC, s.name ASC, c.course_name ASC
+        """)
+        
+        attendance_data = []
+        for row in cur.fetchall():
+            attendance_data.append({
+                "Student Name": row[0],
+                "Batch": row[1],
+                "Lab Group": row[2],
+                "Subject": row[3],
+                "Attended": row[4],
+                "Total": row[5],
+                "Attendance %": float(row[6]) if row[6] is not None else 0.0
+            })
+        
+        cur.close()
+        conn.close()
+        
+        return jsonify({"student_attendance": attendance_data})
+        
+    except Exception as e:
+        print(f"ERROR: Failed to get student attendance: {str(e)}")
+        cur.close()
+        conn.close()
+        return jsonify({"error": "Internal server error"}), 500
